@@ -1,0 +1,20 @@
+#Compiled files
+*.o
+*.out
+hello
+employee
+logwriter
+simple_pipe
+consumer
+producer
+bidirectional
+
+#Log files
+*.log
+
+#txt files
+*.txt
+
+# Editor backups
+*~
+*.swp
