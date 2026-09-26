@@ -85,31 +85,33 @@ print("\n--- Running Task 1 ---")
 # 1.1 One-Hot Encode Categorical Columns using pd.get_dummies()
 # Hint: Encode 'season' for df_bike and 'cp' for df_heart. Use drop_first=True.
 # TODO: Your code here
-df_bike_encoded = None
-df_heart_encoded = None
+df_bike_encoded = pd.get_dummies(df_bike, columns=['season'], drop_first=True)
+df_heart_encoded = pd.get_dummies(df_heart, columns=['cp'], drop_first=True)
 
 # 1.2 Separate Features (X) and Target (y) variables
 # TODO: Your code here
-X_bike = None
-y_bike = None
+X_bike = df_bike_encoded.drop(columns='cnt')
+y_bike = df_bike_encoded['cnt']
 
-X_heart = None
-y_heart = None
+X_heart = df_heart_encoded.drop(columns='target')
+y_heart = df_heart_encoded['target']
 
 # 1.3 Split both datasets into 80% training and 20% testing sets
 # Hint: Use train_test_split, set random_state=42. Stratify the heart dataset target.
 # TODO: Your code here
-X_train_b, X_test_b, y_train_b, y_test_b = None, None, None, None
-X_train_h, X_test_h, y_train_h, y_test_h = None, None, None, None
+X_train_b, X_test_b, y_train_b, y_test_b = train_test_split(X_bike, y_bike, train_size=0.8, test_size=0.2, random_state=42)
+X_train_h, X_test_h, y_train_h, y_test_h = train_test_split(X_heart, y_heart, train_size=0.8, test_size=0.2, random_state=42, stratify=y_heart)
 
 # 1.4 Standardize continuous features using StandardScaler
 # Hint: Fit and transform on train data; transform ONLY on test data.
 # TODO: Your code here
-X_train_b_scaled = None
-X_test_b_scaled = None
+scaler_b = StandardScaler()
+X_train_b_scaled = scaler_b.fit_transform(X_train_b)
+X_test_b_scaled = scaler_b.transform(X_test_b)
 
-X_train_h_scaled = None
-X_test_h_scaled = None
+scaler_h = StandardScaler()
+X_train_h_scaled = scaler_h.fit_transform(X_train_h)
+X_test_h_scaled = scaler_h.transform(X_test_h)
 
 
 # ==============================================================================
@@ -119,18 +121,28 @@ print("\n--- Running Task 2 ---")
 
 # 2.1 Initialize and fit the Multiple Linear Regression model
 # TODO: Your code here
-lin_reg = None
+lin_reg = LinearRegression().fit(X_train_b_scaled, y_train_b)
 
 # 2.2 Print out the model intercept and feature coefficients
 # TODO: Your code here
+print("Intercepts: ", lin_reg.intercept_)
+# prints '[feature]: coefficient' from linear reg model
+print("Coefficients:")
+for feature, coefficient in zip(X_bike.columns, lin_reg.coef_):
+    print(feature, ":", coefficient)
 
 # 2.3 Generate predictions on the scaled test set
 # TODO: Your code here
-y_pred_b = None
+y_pred_b = lin_reg.predict(X_test_b_scaled)
 
 # 2.4 Compute and print regression metrics: MSE, RMSE, and R2 Score
 # TODO: Your code here
-
+mse_b = mean_squared_error(y_test_b, y_pred_b)
+rmse_b = np.sqrt(mse_b)
+r2_b = r2_score(y_test_b, y_pred_b)
+print("MSE: ", mse_b)
+print("RMSE: ", rmse_b)
+print("R2 score: ", r2_b)
 
 # ==============================================================================
 # TASK 3: LOGISTIC REGRESSION MODEL & CLASS IMBALANCE MITIGATION
@@ -139,11 +151,13 @@ print("\n--- Running Task 3 ---")
 
 # 3.1 Print the percentage distribution of the target variable in y_train_h
 # TODO: Your code here
-
+targetperc = y_train_h.value_counts(normalize = True) * 100
+print("Percent distribution of target variable (heart): \n", targetperc)
 # 3.2 Initialize SMOTE and resample the scaled training classification data
 # Hint: Use the fit_resample method on X_train_h_scaled and y_train_h with random_state=42.
 # TODO: Your code here
-X_train_h_smote, y_train_h_smote = None, None
+smote = SMOTE(random_state=42)
+X_train_h_smote, y_train_h_smote = smote.fit_resample(X_train_h_scaled, y_train_h)
 
 # 3.3 Set up three variants of the Logistic Regression model
 # Variant 1: Baseline model (default settings)
@@ -152,9 +166,9 @@ X_train_h_smote, y_train_h_smote = None, None
 # Hint: Remember to use random_state=42 for all initializations.
 # TODO: Your code here
 models_logistic = {
-    'Baseline': None,
-    'Balanced_Weights': None,
-    'SMOTE_Resampled': None
+    'Baseline': LogisticRegression(random_state=42),
+    'Balanced_Weights': LogisticRegression(random_state=42, class_weight='balanced'),
+    'SMOTE_Resampled': LogisticRegression(random_state=42)
 }
 
 # 3.4 Train the models, generate predictions, and extract performance metrics
@@ -164,32 +178,40 @@ roc_plotting_data = {}
 
 for name, model in models_logistic.items():
     # TODO: Fit the model on the correct training data variation
-    pass
-    
+    # Fits model on resampled if model name is 'SMOTE_Resampled', else train on scaled
+    if name == 'SMOTE_Resampled':
+        model.fit(X_train_h_smote, y_train_h_smote)
+    else:
+        model.fit(X_train_h_scaled, y_train_h)
     # TODO: Generate class predictions on the original unmutated test set (X_test_h_scaled)
-    preds = None
+    preds = model.predict(X_test_h_scaled)
     
     # TODO: Generate predicted probabilities using predict_proba() for the positive class (column 1)
-    probs = None
+    probs = model.predict_proba(X_test_h_scaled)[:, 1]
     
     # TODO: Compute and store classification metrics (Accuracy, Precision, Recall, F1, Confusion Matrix)
     # Complete the dictionary entry below
     metrics_summary[name] = {
-        'Accuracy': None,
-        'Precision': None,
-        'Recall': None,
-        'F1_Score': None,
-        'Conf_Matrix': None
+        'Accuracy': accuracy_score(y_test_h, preds),
+        'Precision': precision_score(y_test_h, preds),
+        'Recall': recall_score(y_test_h, preds),
+        'F1_Score': f1_score(y_test_h, preds),
+        'Conf_Matrix': confusion_matrix(y_test_h, preds)
     }
-    
     # TODO: Compute roc_curve and auc values, then save them into roc_plotting_data
-    fpr, tpr, thresholds = None, None, None
-    roc_auc = None
+    fpr, tpr, thresholds = roc_curve(y_test_h, probs)
+    roc_auc = auc(fpr, tpr)
     roc_plotting_data[name] = (fpr, tpr, roc_auc)
 
 # 3.5 Print out your metrics summary block for all three configurations
 # TODO: Your code here
-
+for name, metrics in metrics_summary.items():
+    print(f"\n{name}")
+    print("Accuracy: ", metrics['Accuracy'])
+    print("Precision: ", metrics['Precision'])
+    print("Recall: ", metrics['Recall'])
+    print("F1 Score: ", metrics['F1_Score'])
+    print("Confusion Matrix: \n", metrics['Conf_Matrix'])
 
 # ==============================================================================
 # TASK 4: VISUALIZATION
@@ -201,10 +223,32 @@ fig, axes = plt.subplots(1, 2, figsize=(16, 7))
 # 4.1 Subplot 1: Create a scatter plot of Actual vs. Predicted values for Linear Regression
 # Hint: Draw a diagonal line indicating perfect prediction accuracy.
 # TODO: Your code here
+# Creates scatter plot
+plt.subplot(1, 2, 1)
+plt.scatter(y_test_b, y_pred_b, alpha=0.6)
+
+# Perfect prediction diagonal line
+min_val = min(y_test_b.min(), y_pred_b.min())
+max_val = max(y_test_b.max(), y_pred_b.max())
+plt.plot([min_val, max_val], [min_val, max_val], 'r-', linewidth=2)
+# Labels
+plt.xlabel("Actual Count")
+plt.ylabel("Predicted Count")
+plt.title("Actual vs. Predicted Bike Rentals")
 
 # 4.2 Subplot 2: Plot and overlay ROC curves for Baseline, Balanced, and SMOTE models
 # Hint: Iterate through roc_plotting_data to label curves and include the calculated AUC score.
 # TODO: Your code here
-
+plt.subplot(1,2,2)
+# iterates through roc_plotting_data
+for model in roc_plotting_data:
+    fpr, tpr, roc_auc = roc_plotting_data[model]
+    plt.plot(fpr, tpr, label=f'{model} (AUC = {roc_auc})')
+# Labels
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curves')
+plt.legend()
 plt.tight_layout()
 plt.show()
+
